@@ -132,7 +132,7 @@ def remove_duplicates(db_path, table_name):
     print(f"Duplicates removed from table '{table_name}'.")
 
 
-def move_unknown_cities_left(db_path, source_table="First_Phase_Done", new_table="First_Phase_Left"):
+def move_unknown_cities_left(db_path, source_table="First_Phase_Done1", new_table="First_Phase_Left"):
     """
     Move rows with 'Unknown' city from the source table to a new table.
     
@@ -166,11 +166,69 @@ def move_unknown_cities_left(db_path, source_table="First_Phase_Done", new_table
     conn.commit()
     conn.close()
     print(f"Unknown city rows moved from {source_table} to {new_table}.")
+    
+def delete_unknown_city_rows(db_path, table_name):
+    """
+    Delete rows from the specified table where the city is 'Unknown'.
+
+    Args:
+        db_path (str): Path to the SQLite database.
+        table_name (str): Name of the table from which to delete rows with 'Unknown' city.
+    """
+    # Connect to the database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Delete rows with 'Unknown' city
+    cursor.execute(f"DELETE FROM {table_name} WHERE City = 'Unknown';")
+
+    # Commit the changes and close the connection
+    conn.commit()
+    conn.close()
+
+    print(f"Rows with 'Unknown' city deleted from table '{table_name}'.")
+
+def move_table_content(db_path, source_table, target_table):
+    """
+    Move content from the source table to the target table.
+
+    Args:
+        db_path (str): Path to the SQLite database.
+        source_table (str): Name of the source table.
+        target_table (str): Name of the target table.
+    """
+    # Connect to the database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Check if the source table exists
+    cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{source_table}';")
+    if not cursor.fetchone():
+        print(f"Source table '{source_table}' does not exist.")
+        conn.close()
+        return
+
+    # Check if the target table exists
+    cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{target_table}';")
+    if not cursor.fetchone():
+        print(f"Target table '{target_table}' does not exist.")
+        conn.close()
+        return
+
+    # Move content from source table to target table
+    cursor.execute(f"INSERT INTO {target_table} SELECT * FROM {source_table};")
+
+    # Commit the changes and close the connection
+    conn.commit()
+    conn.close()
+
+    print(f"Content from table '{source_table}' moved to table '{target_table}'.")
+
 
 
 # Example usage
 if __name__ == "__main__":
-    db_path = "tourist_attractions.db"  # Path to your SQLite database
+    db_path = "Dataset/tourist_attractions.db"  # Path to your SQLite database
     table_name = "First_Phase_Done"     # Name of the table to remove duplicates from
     
     # Uncomment the function you want to use:
@@ -191,3 +249,12 @@ if __name__ == "__main__":
     # country_name = "Brunei"
     # new_filtered_table = "Brunei_Attractions"
     # create_filtered_table_by_country(db_path, "First_Phase", new_filtered_table, columns_to_copy, country_name)
+    
+    # Delete rows with 'Unknown' city from the table
+    # delete_unknown_city_rows(db_path, table_name)
+    
+    source_table = "First_Phase_Done1"  # Name of the source table
+    target_table = "First_Phase_Done"  # Name of the target table
+
+    # Move content from source table to target table
+    move_table_content(db_path, source_table, target_table)

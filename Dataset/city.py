@@ -1,124 +1,67 @@
-import pandas as pd
-import re
+import requests
 
+# Define API endpoint and access token
+api_url = "https://route-init.gallimap.com/api/v1/search/currentLocation"
+access_token = "805e896e-209f-44a2-8a1d-28e8847dcdf4"  # Replace with your actual access token
 
-import sqlite3  # SQLite database connector
+# District you want to search
+district_name = "Kathmandu"  # Replace with the district you want to search for
 
-# Database connection details
-db_path = "Dataset/tourist_attractions.db"  # Path to your SQLite database file
+# Latitude and longitude of Nepal's approximate center (you can also use a more specific location)
+nepal_lat = 28.3949
+nepal_lng = 84.1240
 
-# List of valid Asian countries
-asian_countries = [
-    "Afghanistan", "Armenia", "Azerbaijan", "Bahrain", "Bangladesh", "Bhutan", "Brunei", 
-    "Cambodia", "China", "Cyprus", "Georgia", "India", "Indonesia", "Iran", "Iraq", "Israel", 
-    "Japan", "Jordan", "Kazakhstan", "Kuwait", "Kyrgyzstan", "Laos", "Lebanon", "Malaysia", 
-    "Maldives", "Mongolia", "Myanmar", "Nepal", "North Korea", "Oman", "Pakistan", "Palestine", 
-    "Philippines", "Qatar", "Saudi Arabia", "Singapore", "South Korea", "Sri Lanka", "Syria", 
-    "Tajikistan", "Thailand", "Timor-Leste", "Turkey", "Turkmenistan", "United Arab Emirates", 
-    "Uzbekistan", "Vietnam", "Yemen"
-]
+# Keywords or features (you can define different features based on the API capabilities)
+features = ["Attractions", "Parks", "Museums", "Heritage", "Libraries"]
 
-# Helper functions
-def clean_text_field(text):
-    """Clean generic text fields like description or category."""
-    if not isinstance(text, str):
-        return text
-    text = text.strip()
-    text = re.sub(r'\s+', ' ', text)  # Replace multiple spaces with one
-    return text
+def fetch_places(district_name):
+    places = []
 
-def clean_name(name):
-    """Clean and standardize attraction names."""
-    name = clean_text_field(name)
-    name = name.title()
-    corrections = {
-        "eiffel towerr": "Eiffel Tower", 
-        "taj mahall": "Taj Mahal"
-    }
-    return corrections.get(name.lower(), name)
+    for keyword in features:
+        print(f"Fetching places for keyword: {keyword} in district: {district_name}")
+        
+        # API request parameters
+        params = {
+            "accessToken": access_token,
+            "name": f"{keyword} {district_name}",  # Add district to the query
+            "currentLat": nepal_lat,
+            "currentLng": nepal_lng
+        }
+        
+        # Make the request to the API
+        response = requests.get(api_url, params=params)
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Extract places from the response
+            for feature in data.get('data', {}).get('features', []):
+                properties = feature.get('properties', {})
+                geometry = feature.get('geometry', {})
+                coordinates = geometry.get('coordinates', [None, None])
 
-def clean_country(country):
-    """Standardize country names and validate against Asian countries."""
-    country = clean_text_field(country).title()
-    return country if country in asian_countries else None  # Set to None if not valid
-
-def clean_city(city):
-    """Standardize city names."""
-    city = clean_text_field(city)
-    return city.title()
-
-def clean_coordinates(lat, lon):
-    """Ensure latitude and longitude are within valid ranges."""
-    try:
-        lat = float(lat)
-        lon = float(lon)
-        if -90 <= lat <= 90 and -180 <= lon <= 180:
-            return lat, lon
+                # Extract relevant information from each place
+                place = {
+                    "name": properties.get("searchedItem", "N/A"),
+                    "province": properties.get("province", "N/A"),
+                    "district": properties.get("district", district_name),
+                    "municipality": properties.get("municipality", "N/A"),
+                    "ward": properties.get("ward", "N/A"),
+                    "longitude": coordinates[0] if coordinates and len(coordinates) > 0 else "N/A",
+                    "latitude": coordinates[1] if coordinates and len(coordinates) > 1 else "N/A",
+                    "feature": keyword  # Feature is based on the keyword being searched
+                }
+                
+                places.append(place)
+            print(f"Fetched {len(places)} places for keyword: {keyword}")
         else:
-            return None, None  # Return None for invalid coordinates
-    except ValueError:
-        return None, None
+            print(f"Failed to fetch data for {keyword} in {district_name}. Status code: {response.status_code}")
 
-def clean_category(category):
-    """Standardize category names."""
-    category = clean_text_field(category)
-    return category.title()
+    return places
 
-# Connect to SQLite database
-connection = sqlite3.connect(db_path)
-cursor = connection.cursor()
+# Fetch and display the places for a specific district
+district_places = fetch_places(district_name)
 
-try:
-    # Fetch data from Third_Phase table
-    query = "SELECT id, name, country, city, latitude, longitude, category, description FROM Third_Phase"
-    cursor.execute(query)
-    rows = cursor.fetchall()
-
-    # Convert to DataFrame
-    columns = ['id', 'name', 'country', 'city', 'latitude', 'longitude', 'category', 'description']
-    df = pd.DataFrame(rows, columns=columns)
-
-    # Clean fields
-    df['name'] = df['name'].apply(clean_name)
-    df['country'] = df['country'].apply(clean_country)
-    df['city'] = df['city'].apply(clean_city)
-    df[['latitude', 'longitude']] = df.apply(
-        lambda row: pd.Series(clean_coordinates(row['latitude'], row['longitude'])), axis=1
-    )
-    df['category'] = df['category'].apply(clean_category)
-    df['description'] = df['description'].apply(clean_text_field)
-
-    # Create a new table for cleaned data
-    create_table_query = """
-    CREATE TABLE IF NOT EXISTS cleaned_final (
-        id INTEGER PRIMARY KEY,
-        name TEXT,
-        country TEXT,
-        city TEXT,
-        latitude REAL,
-        longitude REAL,
-        category TEXT,
-        description TEXT
-    )
-    """
-    cursor.execute(create_table_query)
-
-    # Insert cleaned data into the new table
-    insert_query = """
-    INSERT INTO cleaned_final (id, name, country, city, latitude, longitude, category, description)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """
-    for _, row in df.iterrows():
-        cursor.execute(insert_query, tuple(row))
-
-    # Commit the changes
-    connection.commit()
-    print("Cleaned data has been successfully written to the 'cleaned_final' table.")
-
-except Exception as e:
-    print(f"An error occurred: {e}")
-    connection.rollback()
-finally:
-    # Close the connection
-    cursor.close()
-    connection.close()
+# Print the places for verification
+for place in district_places:
+    print(place)

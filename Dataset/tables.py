@@ -229,12 +229,12 @@ def move_table_content(db_path, source_table, target_table):
 # Example usage
 if __name__ == "__main__":
     db_path = "Dataset/tourist_attractions.db"  # Path to your SQLite database
-    table_name = "First_Phase_Done"     # Name of the table to remove duplicates from
+    table_name = "attractions_nepal"     # Name of the table to remove duplicates from
     
     # Uncomment the function you want to use:
 
     # Remove duplicates from the table
-    # remove_duplicates(db_path, table_name)
+    remove_duplicates(db_path, table_name)
 
     # Move rows with 'Unknown' city to a new table
     # move_unknown_cities_left(db_path)
@@ -253,8 +253,8 @@ if __name__ == "__main__":
     # Delete rows with 'Unknown' city from the table
     # delete_unknown_city_rows(db_path, table_name)
     
-    source_table = "First_Phase_Done1"  # Name of the source table
-    target_table = "First_Phase_Done"  # Name of the target table
+    # source_table = "First_Phase_Done1"  # Name of the source table
+    # target_table = "First_Phase_Done"  # Name of the target table
 
-    # Move content from source table to target table
-    move_table_content(db_path, source_table, target_table)
+    # # Move content from source table to target table
+    # move_table_content(db_path, source_table, target_table)
